@@ -67,14 +67,26 @@ SMALL = [
     NS(repo="Hypermedia_Polimi_24-25", title="Soul Sanctuary", lang="Vue", lc="#41B883", d=["Nuxt 3 SSR site for", "a wellness studio"], m="9 pages · 8 APIs"),
     NS(repo="BarbieriDiLorenzo", title="Students & Companies", lang="Java", lc="#B07219", d=["Internship matching", "platform"], m="Servlets · MySQL"),
 ]
-# newest first; year from the course year in each repo name; lane = kind of work (0 hardware, 1 software eng., 2 AI, 3 apps)
-HISTORY = [
-    ("2026", "Open Plaud Studio", "Python", "#3572A5", 2), ("2026", "SmartScrolling", "Dart", "#00B4AB", 3),
-    ("2025", "SousChef", "Dart", "#00B4AB", 3), ("2025", "Soul Sanctuary", "Vue", "#41B883", 3), ("2025", "Fake News Detector", "Jupyter", "#DA5B0B", 2),
-    ("2024", "Students & Companies", "Java", "#B07219", 1), ("2024", "Role-play Telegram bot", "Python", "#3572A5", 2),
-    ("2024", "TIW web project", "Java", "#B07219", 1), ("2023", "IS23 software engineering", "Java", "#B07219", 1),
-    ("2023", "Reti Logiche", "VHDL", "#ADB2CB", 0), ("2022", "API algorithms project", "C", "#555555", 0),
-]
+# curated graph rows: repo -> (year from the course name, display name, language label, colour, lane)
+# lanes: 0 hardware, 1 software eng., 2 AI, 3 apps. Public repos missing here are added automatically.
+CURATED = {
+    "plaud-backend": ("2026", "Open Plaud Studio", "Python", "#3572A5", 2), "smart_scrolling": ("2026", "SmartScrolling", "Dart", "#00B4AB", 3),
+    "SousChef_DIMA": ("2025", "SousChef", "Dart", "#00B4AB", 3), "Hypermedia_Polimi_24-25": ("2025", "Soul Sanctuary", "Vue", "#41B883", 3),
+    "Fake_News_Detector": ("2025", "Fake News Detector", "Jupyter", "#DA5B0B", 2), "BarbieriDiLorenzo": ("2024", "Students & Companies", "Java", "#B07219", 1),
+    "BasicRolePlay_TelegramBot": ("2024", "Role-play Telegram bot", "Python", "#3572A5", 2), "TIW-project2024": ("2024", "TIW web project", "Java", "#B07219", 1),
+    "project-IS23-AM06": ("2023", "IS23 software engineering", "Java", "#B07219", 1), "Project_Reti-Logiche_2023": ("2023", "Reti Logiche", "VHDL", "#ADB2CB", 0),
+    "API_Project_21-22": ("2022", "API algorithms project", "C", "#555555", 0),
+}
+LANE = {"C": 0, "C++": 0, "VHDL": 0, "Assembly": 0, "Java": 1, "Python": 2, "Jupyter Notebook": 2}
+
+
+def history(repos):
+    """Graph rows for every public repo, newest first: curated rows as written, new repos from their creation year and language."""
+    rows = [CURATED.get(name) or (year, name.replace("_", " ").replace("-", " "), lang, LANGC.get(lang, LANGC["Other"]), LANE.get(lang, 3))
+            for name, lang, year in repos]
+    return sorted(rows, key=lambda r: -int(r[0]))
+
+
 ABOUT = {
     "SousChef_DIMA": "Order-ahead cooking app: Flutter, Firebase, Stripe",
     "smart_scrolling": "Offline-first microlearning app", "Hypermedia_Polimi_24-25": "Nuxt 3 wellness studio site",
@@ -88,9 +100,9 @@ LANGC = {"Java": "#B07219", "Python": "#3572A5", "Dart": "#00B4AB", "JavaScript"
 
 # baked fallbacks (GitHub API, 2026-11-22)
 BAKED = NS(
-    repos=[("smart_scrolling", "Dart"), ("Hypermedia_Polimi_24-25", "Vue"), ("plaud-backend", "Python"), ("BarbieriDiLorenzo", "Java"),
-           ("BasicRolePlay_TelegramBot", "Python"), ("Fake_News_Detector", "Jupyter Notebook"), ("TIW-project2024", "Java"),
-           ("Project_Reti-Logiche_2023", "VHDL"), ("project-IS23-AM06", "Java"), ("API_Project_21-22", "C")],
+    repos=[("smart_scrolling", "Dart", "2026"), ("Hypermedia_Polimi_24-25", "Vue", "2025"), ("plaud-backend", "Python", "2026"), ("BarbieriDiLorenzo", "Java", "2024"),
+           ("BasicRolePlay_TelegramBot", "Python", "2024"), ("Fake_News_Detector", "Jupyter Notebook", "2025"), ("TIW-project2024", "Java", "2024"),
+           ("Project_Reti-Logiche_2023", "VHDL", "2024"), ("project-IS23-AM06", "Java", "2024"), ("API_Project_21-22", "C", "2024")],
     commits=[("026ccc4", "plaud-backend", "feat: initial public release of Open Plaud Studio"),
              ("e55994c", "smart_scrolling", "chore: initial public release under GNU AGPLv3"),
              ("498d7c7", "Hypermedia_Polimi_24-25", "docs: add bento README, MIT license, root .gitignore")],
@@ -116,7 +128,7 @@ def load_data() -> NS:
     try:
         raw = [r for r in api(f"users/{OWNER}/repos?type=owner&sort=pushed&per_page=100")
                if not r["private"] and not r["fork"] and r["name"].lower() != OWNER.lower()]
-        repos = [(r["name"], r.get("language") or "Markdown") for r in raw]
+        repos = [(r["name"], r.get("language") or "Markdown", r["created_at"][:4]) for r in raw]
         langs = {r["name"]: api(f"repos/{OWNER}/{r['name']}/languages") for r in raw}
         commits = []
         for r in raw[:3]:  # sorted by last push
@@ -334,7 +346,8 @@ def card(t, p):
     return svg(w, h, f"{p.title}: {' '.join(p.d)}", "", body)
 
 # ---------------------------------------------------------------- extras
-def git_graph(t):
+def git_graph(t, data):
+    HISTORY = history(data.repos)
     rh, top, mx = 46, 66, 24
     H = top + len(HISTORY) * rh
 
@@ -344,6 +357,8 @@ def git_graph(t):
     lanes = ""
     for li in range(4):
         rows = [i for i, r in enumerate(HISTORY) if r[4] == li]
+        if not rows:
+            continue
         y0, y1 = top + rows[0] * rh - 14, top + rows[-1] * rh - 14
         # branch off main below the oldest commit, merge back into main above the newest
         lanes += (f'<path d="M{mx} {y1 + 34} C{mx} {y1 + 14} {lx(li)} {y1 + 20} {lx(li)} {y1}V{y0}'
@@ -358,7 +373,7 @@ def git_graph(t):
     body = (f'<defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="{t.accent}" stop-opacity="0"/><stop offset="1" stop-color="{t.accent}"/></linearGradient></defs>'
             f'<path d="M{mx} 0V{H}" stroke="{t.accent}" stroke-width="2.5" opacity=".5"/><rect class="p" x="{mx - 2}" y="0" width="4" height="50" rx="2" fill="url(#g)" opacity="0"/>'
             f'<text x="{mx + 12}" y="{top - 46}" {mono(14)} fill="{t.accent}">main</text>{lanes}{rows}')
-    return svg(880, H, "Git graph of public projects, 2022 to 2026: " + ", ".join(f"{r[0]} {r[1]}" for r in HISTORY), css, body)
+    return svg(880, H, f"Git graph of public projects, {HISTORY[-1][0]} to {HISTORY[0][0]}: " + ", ".join(f"{r[0]} {r[1]}" for r in HISTORY), css, body)
 
 
 def flame(t, data):
@@ -412,7 +427,7 @@ def pic(name, alt, width="100%"):
 
 
 def readme(data) -> str:
-    rows = "\n".join(f"| [`{r}`](https://github.com/{OWNER}/{r}) | {lang} | {ABOUT.get(r, 'Public repository')} |" for r, lang in data.repos)
+    rows = "\n".join(f"| [`{r}`](https://github.com/{OWNER}/{r}) | {lang} | {ABOUT.get(r, 'Public repository')} |" for r, lang, _ in data.repos)
     repo = f"https://github.com/{OWNER}"
     cards = "\n".join(f'<a href="{repo}/{p.repo}">{pic("card-" + p.repo.lower(), p.title, "32%")}</a>' for p in SMALL)
     return f"""<!-- Generated by scripts/build_profile.py. Edit the script, not this file. -->
@@ -474,7 +489,7 @@ def main():
             "station-selected": station(t, "02 / 02", "Selected work", "4 public projects"),
             "spotlight": spotlight(t),
             "station-extras": station(t, "", "Extras", "path · languages · every repo", end=True),
-            "git-graph": git_graph(t),
+            "git-graph": git_graph(t, data),
             "languages": flame(t, data),
             "status": status_bar(t, data, today),
             **{"card-" + p.repo.lower(): card(t, p) for p in SMALL},
